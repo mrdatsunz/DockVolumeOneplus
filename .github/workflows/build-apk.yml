@@ -21,10 +21,6 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.2.1'
-      - name: Verificar Android SDK del runner
-        run: |
-          echo "ANDROID_HOME=$ANDROID_HOME"
-          sdkmanager --install "platforms;android-34" "build-tools;34.0.0"
       - name: Compilar instalador debug firmado
         run: gradle --no-daemon --stacktrace assembleDebug
       - name: Publicar APK
