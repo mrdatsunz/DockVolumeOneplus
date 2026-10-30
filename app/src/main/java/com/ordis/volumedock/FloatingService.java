@@ -12,6 +12,7 @@ import android.content.res.Configuration;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
+import android.graphics.Path;
 import android.graphics.PixelFormat;
 import android.graphics.RectF;
 import android.media.AudioManager;
@@ -54,7 +55,7 @@ public class FloatingService extends Service {
             Notification n=new Notification.Builder(this,CHANNEL)
                     .setSmallIcon(R.drawable.ic_volume)
                     .setContentTitle("Volume Dock activo")
-                    .setContentText("Botones de volumen disponibles en pantalla")
+                    .setContentText("Abrir volumen, silencio y candado")
                     .setContentIntent(pi).setOngoing(true)
                     .setCategory(Notification.CATEGORY_SERVICE).build();
             startForeground(1001,n);
@@ -88,14 +89,35 @@ public class FloatingService extends Service {
         if (dock!=null && dock.isAttachedToWindow()) window.updateViewLayout(dock,position);
         if (save) prefs.edit().putInt("x",position.x).putInt("y",position.y).apply();
     }
-    private void changeVolume(boolean higher) {
+    /** Displays the native Android volume control without changing its level. */
+    private void showSystemVolume() {
         if (audio==null) return;
         try {
-            audio.adjustSuggestedStreamVolume(higher ? AudioManager.ADJUST_RAISE :
-                AudioManager.ADJUST_LOWER,AudioManager.USE_DEFAULT_STREAM_TYPE,
-                AudioManager.FLAG_SHOW_UI);
-        } catch (SecurityException|IllegalArgumentException e) {
-            Log.w("VolumeDock","Volume change refused by system",e);
+            audio.adjustSuggestedStreamVolume(AudioManager.ADJUST_SAME,
+                AudioManager.USE_DEFAULT_STREAM_TYPE,AudioManager.FLAG_SHOW_UI);
+        } catch (RuntimeException e) {
+            Log.w("VolumeDock","System volume UI unavailable",e);
+        }
+    }
+
+    /** Brings audible streams to zero, leaving in-call and emergency audio untouched. */
+    private void silencePhone() {
+        if (audio==null) return;
+        int[] streams = {
+            AudioManager.STREAM_RING,
+            AudioManager.STREAM_NOTIFICATION,
+            AudioManager.STREAM_SYSTEM,
+            AudioManager.STREAM_ALARM,
+            AudioManager.STREAM_MUSIC
+        };
+        for (int stream : streams) {
+            try {
+                audio.setStreamVolume(stream,0,
+                    stream==AudioManager.STREAM_MUSIC ? AudioManager.FLAG_SHOW_UI : 0);
+            } catch (RuntimeException e) {
+                // Android may require Do Not Disturb access for ringtone changes.
+                Log.w("VolumeDock","Could not silence audio stream "+stream,e);
+            }
         }
     }
     @Override public void onConfigurationChanged(Configuration configuration) {
@@ -121,7 +143,7 @@ public class FloatingService extends Service {
             super(context);
             slop=ViewConfiguration.get(context).getScaledTouchSlop();
             setClickable(true);
-            setContentDescription("Volumen arriba, candado y volumen abajo");
+            setContentDescription("Abrir control de volumen, bloquear desplazamiento y silenciar teléfono");
         }
         private boolean locked() { return prefs.getBoolean("locked",true); }
         @Override protected void onDraw(Canvas c) {
@@ -135,10 +157,10 @@ public class FloatingService extends Service {
             c.drawRoundRect(new RectF(2,2,62,190),20,20,paint);
             paint.setStyle(Paint.Style.FILL);paint.setColor(Color.rgb(69,96,113));
             c.drawRect(14,64,50,65,paint);c.drawRect(14,127,50,128,paint);
-            paint.setStyle(Paint.Style.STROKE);paint.setStrokeWidth(5f);
-            paint.setStrokeCap(Paint.Cap.ROUND);paint.setColor(Color.WHITE);
-            c.drawLine(22,32,42,32,paint);c.drawLine(32,22,32,42,paint);
-            c.drawLine(22,160,42,160,paint);
+            drawSpeaker(c,32,false);
+            drawSpeaker(c,160,true);
+            paint.setStyle(Paint.Style.STROKE);
+            paint.setStrokeCap(Paint.Cap.ROUND);
             paint.setColor(locked()?0xFF73DCFF:0xFFFFC86A);
             paint.setStrokeWidth(3f);
             if(locked()) c.drawArc(new RectF(24,77,40,100),180,180,false,paint);
@@ -151,6 +173,31 @@ public class FloatingService extends Service {
             paint.setColor(0xFF101B2C);c.drawCircle(32,101,2.5f,paint);
             c.drawRect(31,102,33,107,paint);
             c.restore();
+        }
+        /** Volume glyph and crossed-out speaker glyph, drawn without extra resources. */
+        private void drawSpeaker(Canvas canvas,float centerY,boolean muted) {
+            paint.setStyle(Paint.Style.FILL);
+            paint.setColor(Color.WHITE);
+            Path speaker=new Path();
+            speaker.moveTo(15,centerY-7);
+            speaker.lineTo(23,centerY-7);
+            speaker.lineTo(34,centerY-15);
+            speaker.lineTo(34,centerY+15);
+            speaker.lineTo(23,centerY+7);
+            speaker.lineTo(15,centerY+7);
+            speaker.close();
+            canvas.drawPath(speaker,paint);
+            paint.setStyle(Paint.Style.STROKE);
+            paint.setStrokeCap(Paint.Cap.ROUND);
+            paint.setStrokeWidth(2.8f);
+            if (muted) {
+                paint.setColor(0xFFFFC86A);
+                canvas.drawLine(15,centerY+16,49,centerY-16,paint);
+            } else {
+                paint.setColor(Color.WHITE);
+                canvas.drawArc(new RectF(33,centerY-11,45,centerY+11),-64,128,false,paint);
+                canvas.drawArc(new RectF(35,centerY-17,54,centerY+17),-64,128,false,paint);
+            }
         }
         @Override public boolean onTouchEvent(MotionEvent ev) {
             switch(ev.getActionMasked()) {
@@ -173,11 +220,11 @@ public class FloatingService extends Service {
                     if(moving) move(position.x,position.y,true);
                     else if(!gestureMoved) {
                         float section=ev.getY()/(getHeight()/3f);
-                        if(section<1f)changeVolume(true);
+                        if(section<1f)showSystemVolume();
                         else if(section<2f) {
                             prefs.edit().putBoolean("locked",!locked()).apply();
                             invalidate();
-                        } else changeVolume(false);
+                        } else silencePhone();
                         performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY);
                     }
                     moving=false;gestureMoved=false;performClick();
