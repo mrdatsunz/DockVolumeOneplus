@@ -1,24 +1,23 @@
-# Volume Dock 1.2 — OnePlus 7T Pro
+# Volume Dock 1.3 — OnePlus 7T Pro
 
-Control de volumen Android nativo con una cápsula flotante de tres mandos.
+Cápsula flotante Android con **solo dos botones**. Actualización solicitada por el propietario: se retira el botón de silencio y toda autorización de No molestar.
 
 ## Controles
-- **Altavoz superior**: muestra el deslizador original de Android con `ADJUST_SAME` + `FLAG_SHOW_UI`, sin incrementar ni disminuir el audio.
-- **Candado central**: habilita / bloquea el arrastre y guarda la posición.
-- **Altavoz tachado inferior**: lleva a cero multimedia, timbre, notificaciones, sistema y alarmas cuando el sistema lo permite. No modifica el volumen de llamadas activas o emergencias.
+- **Altavoz (superior):** muestra el deslizador de volumen nativo de Android con `AudioManager.ADJUST_SAME` y `FLAG_SHOW_UI`, sin variar el volumen.
+- **Candado (inferior):** bloquea o desbloquea la posibilidad de arrastrar la cápsula. Su posición se guarda.
+- Nueva cápsula compacta **64 × 128 dp** (antes 64 × 192 dp).
 
-## Permisos y persistencia
-- Permiso de superposición; notificaciones en Android 13+; exclusión opcional del ahorro de batería.
-- Permiso opcional de control de No molestar para permitir la bajada de timbre a silencio cuando Android lo exija.
-- Servicio en primer plano y notificación continua con START_STICKY; arranque al reiniciar si ya estaba habilitado.
-- Detener manualmente: Ajustes > Aplicaciones > Volume Dock > Forzar detención.
-- Sin root, sin servicios de accesibilidad y sin Internet.
+## Funcionamiento
+- Servicio Android en primer plano con notificación y `START_STICKY`.
+- Inicio al arrancar el terminal si se había activado y Android lo permite.
+- Superposición, notificaciones en Android 13+ y exclusión opcional de ahorro de batería.
+- Sin permiso de No molestar, sin root, sin accesibilidad, sin Internet y sin botón para cerrar.
+- Para detener la aplicación: Ajustes del dispositivo > Aplicaciones > Volume Dock > Forzar detención.
 
-## Importante
-- El botón de silencio **también puede silenciar alarmas programadas**. Recuerda restablecerlas cuando las necesites.
-- El permiso de No molestar autoriza cambios de timbre pero no significa que Volume Dock active el modo No molestar; modifica volúmenes individuales.
-- Android y OxygenOS pueden terminar el servicio; la permanencia absoluta no puede garantizarse.
-- Las compilaciones de prueba se firman con un certificado debug generado por el runner. Puede ser necesario desinstalar una versión anterior antes de instalar esta APK, con pérdida de los ajustes locales.
+## Limitaciones
+- Android/OxygenOS pueden detener un servicio incluso si está en primer plano; no es posible prometer persistencia absoluta.
+- Instalador debug firmado automáticamente en cada runner de GitHub Actions. La firma puede cambiar entre compilaciones, de modo que Android podría exigir desinstalar la versión anterior antes de instalar una nueva (con pérdida de ajustes internos).
+- Compatibilidad real con el OnePlus 7T Pro pendiente de verificación mediante prueba en el dispositivo.
 
 ## Instalador
-GitHub Actions > Compilar APK de Volume Dock > Artifacts > VolumeDock-OnePlus-APK. El ZIP contiene `app-debug.apk` firmado.
+GitHub Actions → Compilar APK de Volume Dock → Artifacts → VolumeDock-OnePlus-APK → app-debug.apk.

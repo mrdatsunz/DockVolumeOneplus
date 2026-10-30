@@ -55,7 +55,7 @@ public class FloatingService extends Service {
             Notification n=new Notification.Builder(this,CHANNEL)
                     .setSmallIcon(R.drawable.ic_volume)
                     .setContentTitle("Volume Dock activo")
-                    .setContentText("Abrir volumen, silencio y candado")
+                    .setContentText("Abrir volumen de Android y bloquear posición")
                     .setContentIntent(pi).setOngoing(true)
                     .setCategory(Notification.CATEGORY_SERVICE).build();
             startForeground(1001,n);
@@ -70,7 +70,7 @@ public class FloatingService extends Service {
     private void createDock() {
         dock=new Dock(this);
         DisplayMetrics m=getResources().getDisplayMetrics();
-        int w=dp(64),h=dp(192);
+        int w=dp(64),h=dp(128);
         int defaultX=m.widthPixels-w-dp(12),defaultY=(m.heightPixels-h)/2;
         position=new WindowManager.LayoutParams(w,h,WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
                 WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE|WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL,
@@ -100,26 +100,6 @@ public class FloatingService extends Service {
         }
     }
 
-    /** Brings audible streams to zero, leaving in-call and emergency audio untouched. */
-    private void silencePhone() {
-        if (audio==null) return;
-        int[] streams = {
-            AudioManager.STREAM_RING,
-            AudioManager.STREAM_NOTIFICATION,
-            AudioManager.STREAM_SYSTEM,
-            AudioManager.STREAM_ALARM,
-            AudioManager.STREAM_MUSIC
-        };
-        for (int stream : streams) {
-            try {
-                audio.setStreamVolume(stream,0,
-                    stream==AudioManager.STREAM_MUSIC ? AudioManager.FLAG_SHOW_UI : 0);
-            } catch (RuntimeException e) {
-                // Android may require Do Not Disturb access for ringtone changes.
-                Log.w("VolumeDock","Could not silence audio stream "+stream,e);
-            }
-        }
-    }
     @Override public void onConfigurationChanged(Configuration configuration) {
         super.onConfigurationChanged(configuration);
         if (position!=null) move(position.x,position.y,true);
@@ -143,22 +123,21 @@ public class FloatingService extends Service {
             super(context);
             slop=ViewConfiguration.get(context).getScaledTouchSlop();
             setClickable(true);
-            setContentDescription("Abrir control de volumen, bloquear desplazamiento y silenciar teléfono");
+            setContentDescription("Abrir control de volumen y bloquear desplazamiento");
         }
         private boolean locked() { return prefs.getBoolean("locked",true); }
         @Override protected void onDraw(Canvas c) {
             super.onDraw(c);
-            c.save(); c.scale(getWidth()/64f,getHeight()/192f);
+            c.save(); c.scale(getWidth()/64f,getHeight()/128f);
             paint.setStyle(Paint.Style.FILL);
             paint.setColor(Color.argb(238,12,23,40));
-            c.drawRoundRect(new RectF(1,1,63,191),22,22,paint);
+            c.drawRoundRect(new RectF(1,1,63,127),22,22,paint);
             paint.setStyle(Paint.Style.STROKE);paint.setStrokeWidth(1.2f);
             paint.setColor(Color.rgb(71,111,133));
-            c.drawRoundRect(new RectF(2,2,62,190),20,20,paint);
+            c.drawRoundRect(new RectF(2,2,62,126),20,20,paint);
             paint.setStyle(Paint.Style.FILL);paint.setColor(Color.rgb(69,96,113));
-            c.drawRect(14,64,50,65,paint);c.drawRect(14,127,50,128,paint);
-            drawSpeaker(c,32,false);
-            drawSpeaker(c,160,true);
+            c.drawRect(14,63,50,64,paint);
+            drawSpeaker(c,32);
             paint.setStyle(Paint.Style.STROKE);
             paint.setStrokeCap(Paint.Cap.ROUND);
             paint.setColor(locked()?0xFF73DCFF:0xFFFFC86A);
@@ -174,8 +153,8 @@ public class FloatingService extends Service {
             c.drawRect(31,102,33,107,paint);
             c.restore();
         }
-        /** Volume glyph and crossed-out speaker glyph, drawn without extra resources. */
-        private void drawSpeaker(Canvas canvas,float centerY,boolean muted) {
+        /** Speaker glyph for the system volume slider. */
+        private void drawSpeaker(Canvas canvas,float centerY) {
             paint.setStyle(Paint.Style.FILL);
             paint.setColor(Color.WHITE);
             Path speaker=new Path();
@@ -190,14 +169,9 @@ public class FloatingService extends Service {
             paint.setStyle(Paint.Style.STROKE);
             paint.setStrokeCap(Paint.Cap.ROUND);
             paint.setStrokeWidth(2.8f);
-            if (muted) {
-                paint.setColor(0xFFFFC86A);
-                canvas.drawLine(15,centerY+16,49,centerY-16,paint);
-            } else {
-                paint.setColor(Color.WHITE);
-                canvas.drawArc(new RectF(33,centerY-11,45,centerY+11),-64,128,false,paint);
-                canvas.drawArc(new RectF(35,centerY-17,54,centerY+17),-64,128,false,paint);
-            }
+            paint.setColor(Color.WHITE);
+            canvas.drawArc(new RectF(33,centerY-11,45,centerY+11),-64,128,false,paint);
+            canvas.drawArc(new RectF(35,centerY-17,54,centerY+17),-64,128,false,paint);
         }
         @Override public boolean onTouchEvent(MotionEvent ev) {
             switch(ev.getActionMasked()) {
@@ -219,12 +193,12 @@ public class FloatingService extends Service {
                     down=false;
                     if(moving) move(position.x,position.y,true);
                     else if(!gestureMoved) {
-                        float section=ev.getY()/(getHeight()/3f);
-                        if(section<1f)showSystemVolume();
-                        else if(section<2f) {
+                        if(ev.getY()<getHeight()/2f) {
+                            showSystemVolume();
+                        } else {
                             prefs.edit().putBoolean("locked",!locked()).apply();
                             invalidate();
-                        } else silencePhone();
+                        }
                         performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY);
                     }
                     moving=false;gestureMoved=false;performClick();
